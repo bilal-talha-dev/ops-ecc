@@ -7,9 +7,28 @@
 
 **`ops-ecc`** is a single-binary, zero-runtime-dependency **Rust CLI** and **AI Agent Harness** built for **Full-Stack**, **Cloud/IaC (AWS & Azure)**, **Container/Kubernetes**, and **DevSecOps** engineering.
 
-It works in two ways simultaneously:
-1. **AI Agent Harness** for **Claude Code (`.claude/`)**, **Gemini CLI (`.gemini/` + `GEMINI.md`)**, **Cursor (`.cursorrules`)**, and **Universal `AGENTS.md`** — embedding 4 production rules, 8 specialized agents, 6 deep skills, 6 slash commands, and `<5ms` native Rust guardrails directly inside the binary.
-2. **Standalone DevSecOps Engine** — a parallel (`rayon` + `ignore` + `hcl-rs`) static security scanner, environment readiness checker (`doctor`), and hardened template generator (`scaffold`) that runs in `<20ms` locally or inside CI/CD pipelines with **SARIF 2.1.0** output.
+---
+
+## In Simple Terms: What Is `ops-ecc` & What Can You Use It For?
+
+Whether you work solo, with a team, or with AI coding assistants, `ops-ecc` acts as both your **automated DevSecOps security guard** and your **AI engineering rulebook**:
+
+- **Scan any repo for security bugs in under 20ms (`ops-ecc audit`)**: Finds leaked AWS/Azure/API keys, hardcoded database passwords, `0.0.0.0/0` open SSH/DB ports in Terraform & CloudFormation, root/unpinned Dockerfiles, privileged Kubernetes pods, and insecure GitHub Actions — without needing Docker, Python, or an AI running.
+- **Stop dangerous commands before they run (`ops-ecc hook guard-cmd`)**: Automatically blocks `terraform destroy`, `aws s3 rb --force`, `DROP DATABASE`, `rm -rf /`, and `kubectl delete namespace prod` before they can wipe out production.
+- **Generate production-ready infrastructure in 1 second (`ops-ecc scaffold`)**: Outputs hardened AWS/Azure Terraform, CloudFormation, non-root multi-stage Dockerfiles, OIDC GitHub Actions pipelines, and Nginx + Cloudflare Tunnel configs that already pass strict security audits.
+- **Check your machine & CI readiness (`ops-ecc doctor`)**: Audits 13 DevOps/DevSecOps tools (`git`, `docker`, `terraform`, `tflint`, `checkov`, `cfn-lint`, `hadolint`, `trivy`, `gitleaks`, `aws`, `az`, `node`, `python3`) in parallel and tells you what is ready or missing.
+- **Keep app code and infrastructure in sync (`Infra-Sync Rule`)**: Enforces that whenever you add an environment variable, queue, bucket, or database in your Next.js/Node/FastAPI/Rust code, the matching Terraform/CloudFormation/Docker config is updated at the same time.
+
+---
+
+## What Happens When You Connect `ops-ecc` to Claude Code (or Gemini CLI)?
+
+Once you run `ops-ecc init` (globally or inside a project) and open **`claude`** (or **`gemini`** / **Cursor**), your AI assistant is upgraded with a full DevOps & DevSecOps safety net:
+
+1. **It follows your production rulebook automatically:** Claude loads `.claude/rules/`, 8 specialized DevOps/Security agents, and 6 deep skills — so it writes least-privilege IAM, encrypted RDS/S3, and non-root Dockerfiles by default instead of insecure shortcuts.
+2. **Every file edit is checked live in `<5ms`:** The moment Claude edits a `.tf`, `.yaml`, `Dockerfile`, or `.json` file, Claude Code automatically triggers `ops-ecc hook post-edit`. If there is a syntax error, hardcoded secret, or `0.0.0.0/0` port exposure, `ops-ecc` blocks it (`exit code 2`) and tells Claude the exact line and fix — so **Claude fixes its own mistake before finishing**.
+3. **Destructive shell commands are blocked:** If Claude ever tries to run `terraform destroy` or `DROP TABLE`, `ops-ecc hook guard-cmd` intercepts and blocks it before execution.
+4. **You get 6 ready-to-use DevOps slash commands:** Type `/plan-stack`, `/infra-gen`, `/sec-audit`, `/harden-docker`, `/setup-oidc-cicd`, or `/triage-incident` directly inside Claude Code.
 
 ---
 
