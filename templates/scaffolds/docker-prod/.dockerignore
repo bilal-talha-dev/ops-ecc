@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env.*
+*.pem
+*.key
+node_modules
+target
+dist
+coverage
+.claude
+.gemini
+.ops-ecc-backup-*

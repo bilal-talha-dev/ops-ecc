@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ops-ecc Production Hardened CloudFormation Stack with KMS, Least-Privilege IAM & DeletionPolicy Retain"
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment name
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Target VPC ID
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private isolated subnets for RDS PostgreSQL
+  AppSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Application security group allowed to reach PostgreSQL on 5432
+
+Resources:
+  WorkloadKmsKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: CMK for RDS, S3, and SQS encryption at rest
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EnableRootAccountPermissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action:
+              - "kms:Create*"
+              - "kms:Describe*"
+              - "kms:Enable*"
+              - "kms:List*"
+              - "kms:Put*"
+              - "kms:Update*"
+              - "kms:Revoke*"
+              - "kms:Disable*"
+              - "kms:Get*"
+              - "kms:Delete*"
+              - "kms:ScheduleKeyDeletion"
+              - "kms:CancelKeyDeletion"
+              - "kms:Encrypt"
+              - "kms:Decrypt"
+              - "kms:GenerateDataKey*"
+            Resource: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "ops-ecc-${EnvironmentName}-artifacts-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt WorkloadKmsKey.Arn
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow PostgreSQL 5432 strictly from AppSecurityGroupId
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: PostgreSQL from application tasks only
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroupId
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Isolated database subnet group
+      SubnetIds: !Ref PrivateSubnetIds
+
+  PrimaryDatabase:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Engine: postgres
+      EngineVersion: "16.4"
+      DBInstanceClass: db.t4g.medium
+      AllocatedStorage: "50"
+      StorageEncrypted: true
+      KmsKeyId: !GetAtt WorkloadKmsKey.Arn
+      MasterUsername: app_db_admin
+      ManageMasterUserPassword: true
+      MultiAZ: true
+      PubliclyAccessible: false
+      DeletionProtection: true
+      BackupRetentionPeriod: 14
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt DatabaseSecurityGroup.GroupId
+
+  ApplicationTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ScopedArtifactAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub "${ArtifactsBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                Resource: !GetAtt WorkloadKmsKey.Arn
+
+Outputs:
+  ArtifactsBucketName:
+    Value: !Ref ArtifactsBucket
+  DatabaseEndpoint:
+    Value: !GetAtt PrimaryDatabase.Endpoint.Address

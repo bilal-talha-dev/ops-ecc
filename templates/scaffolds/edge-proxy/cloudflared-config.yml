@@ -1,0 +1,24 @@
+# Cloudflare Zero Trust Tunnel configuration (Outbound-only origin isolation)
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /etc/cloudflared/credentials.json
+origincert: /etc/cloudflared/cert.pem
+
+no-autoupdate: true
+retries: 5
+protocol: quic
+
+ingress:
+  - hostname: app.example.com
+    service: https://localhost:443
+    originRequest:
+      originServerName: app.example.com
+      connectTimeout: 10s
+      tlsTimeout: 10s
+      keepAliveConnections: 100
+      noTLSVerify: false
+  - hostname: api.example.com
+    service: https://localhost:443
+    originRequest:
+      originServerName: app.example.com
+      connectTimeout: 10s
+  - service: http_status:404
